@@ -14,7 +14,7 @@ import java.net.http.HttpResponse;
 @Slf4j
 public class EmailService {
 
-    @Value("${resend.api.key}")
+    @Value("${RESEND_API_KEY:}")
     private String resendApiKey;
 
     @Value("${spring.mail.username}")
