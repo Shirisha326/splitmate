@@ -15,7 +15,7 @@ import java.net.http.HttpResponse;
 public class EmailService {
 
     @Value("${resend.api.key}")
-    private String brevoApiKey;
+    private String resendApiKey;
 
     @Value("${spring.mail.username}")
     private String fromEmail;
@@ -31,21 +31,21 @@ public class EmailService {
         try {
             String body = String.format("""
                 {
-                    "sender": {"name": "%s", "email": "%s"},
-                    "to": [{"email": "%s", "name": "%s"}],
+                    "from": "%s <%s>",
+                    "to": ["%s"],
                     "subject": "%s",
-                    "htmlContent": "%s"
+                    "html": "%s"
                 }
                 """,
                 FROM_NAME, fromEmail,
-                toEmail, toName,
+                toEmail,
                 subject,
                 htmlContent.replace("\"", "\\\"").replace("\n", "").replace("\r", "")
             );
 
             HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(EMAIL_API_URL))
-                .header("api-key", brevoApiKey)
+                .header("Authorization", "Bearer " + resendApiKey)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build();
@@ -53,10 +53,10 @@ public class EmailService {
             HttpResponse<String> response = httpClient.send(request,
                 HttpResponse.BodyHandlers.ofString());
 
-            if (response.statusCode() == 201) {
+            if (response.statusCode() == 200 || response.statusCode() == 201) {
                 log.info("Email sent successfully to: {}", toEmail);
             } else {
-                log.error("Brevo API error {}: {}", response.statusCode(), response.body());
+                log.error("Resend API error {}: {}", response.statusCode(), response.body());
             }
         } catch (Exception e) {
             log.error("Failed to send email to {}: {}", toEmail, e.getMessage());
