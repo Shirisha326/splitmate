@@ -17,27 +17,22 @@ public class EmailService {
     @Value("${RESEND_API_KEY:}")
     private String resendApiKey;
 
-    @Value("${spring.mail.username}")
-    private String fromEmail;
-
     @Value("${app.base-url}")
     private String baseUrl;
 
     private static final HttpClient httpClient = HttpClient.newHttpClient();
     private static final String EMAIL_API_URL = "https://api.resend.com/emails";
-    private static final String FROM_NAME = "SplitMate";
 
     private void sendEmail(String toEmail, String toName, String subject, String htmlContent) {
         try {
             String body = String.format("""
                 {
-                    "from": "%s <%s>",
+                    "from": "SplitMate <onboarding@resend.dev>",
                     "to": ["%s"],
                     "subject": "%s",
                     "html": "%s"
                 }
                 """,
-                FROM_NAME, fromEmail,
                 toEmail,
                 subject,
                 htmlContent.replace("\"", "\\\"").replace("\n", "").replace("\r", "")
