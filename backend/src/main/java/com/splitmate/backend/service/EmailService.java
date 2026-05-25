@@ -14,7 +14,7 @@ import java.net.http.HttpResponse;
 @Slf4j
 public class EmailService {
 
-    @Value("${brevo.api.key}")
+    @Value("${resend.api.key}")
     private String brevoApiKey;
 
     @Value("${spring.mail.username}")
@@ -24,7 +24,7 @@ public class EmailService {
     private String baseUrl;
 
     private static final HttpClient httpClient = HttpClient.newHttpClient();
-    private static final String BREVO_URL = "https://api.brevo.com/v3/smtp/email";
+    private static final String EMAIL_API_URL = "https://api.resend.com/emails";
     private static final String FROM_NAME = "SplitMate";
 
     private void sendEmail(String toEmail, String toName, String subject, String htmlContent) {
@@ -44,7 +44,7 @@ public class EmailService {
             );
 
             HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(BREVO_URL))
+                .uri(URI.create(EMAIL_API_URL))
                 .header("api-key", brevoApiKey)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
