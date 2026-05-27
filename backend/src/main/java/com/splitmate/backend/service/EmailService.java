@@ -1,56 +1,87 @@
 package com.splitmate.backend.service;
 
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    @Value("${RESEND_API_KEY}")
+    private String resendApiKey;
 
-    @Value("${spring.mail.username}")
+    @Value("${MAIL_USERNAME}")
     private String fromEmail;
 
     @Value("${app.base-url}")
     private String baseUrl;
 
     private void sendEmail(String toEmail, String subject, String htmlContent) {
+
         try {
-            MimeMessage message = mailSender.createMimeMessage();
 
-            MimeMessageHelper helper =
-                    new MimeMessageHelper(message, true, "UTF-8");
+            URL url = new URL("https://api.resend.com/emails");
 
-            helper.setFrom("SplitMate <" + fromEmail + ">");
-            helper.setTo(toEmail);
-            helper.setSubject(subject);
-            helper.setText(htmlContent, true);
+            HttpURLConnection conn =
+                    (HttpURLConnection) url.openConnection();
 
-            mailSender.send(message);
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Authorization",
+                    "Bearer " + resendApiKey);
 
-            log.info("Email sent successfully to {}", toEmail);
+            conn.setRequestProperty("Content-Type",
+                    "application/json");
 
-        } catch (MessagingException e) {
-            log.error("Failed to send email to {}: {}", toEmail, e.getMessage());
+            conn.setDoOutput(true);
+
+            JSONObject json = new JSONObject();
+
+            json.put("from", "SplitMate <" + fromEmail + ">");
+            json.put("to", toEmail);
+            json.put("subject", subject);
+            json.put("html", htmlContent);
+
+            OutputStream os = conn.getOutputStream();
+            os.write(json.toString().getBytes());
+            os.flush();
+            os.close();
+
+            int responseCode = conn.getResponseCode();
+
+            if (responseCode >= 200 && responseCode < 300) {
+                log.info("Email sent successfully to {}", toEmail);
+            } else {
+                log.error("Failed to send email. Response code: {}",
+                        responseCode);
+            }
+
+        } catch (Exception e) {
+
+            log.error("Failed to send email to {}: {}",
+                    toEmail,
+                    e.getMessage());
         }
     }
 
     @Async
-    public void sendMemberAddedEmail(String toEmail, String memberName,
-                                     String groupName, boolean isNewUser) {
+    public void sendMemberAddedEmail(String toEmail,
+                                     String memberName,
+                                     String groupName,
+                                     boolean isNewUser) {
 
         String content;
 
         if (isNewUser) {
+
             content = buildEmail(
                     memberName,
                     "You've been added to " + groupName,
@@ -60,7 +91,9 @@ public class EmailService {
                     "Login to SplitMate",
                     baseUrl
             );
+
         } else {
+
             content = buildEmail(
                     memberName,
                     "You've been added to " + groupName,
@@ -129,7 +162,9 @@ public class EmailService {
     }
 
     @Async
-    public void sendOtpEmail(String toEmail, String name, String otp) {
+    public void sendOtpEmail(String toEmail,
+                             String name,
+                             String otp) {
 
         String content = buildEmail(
                 name,
