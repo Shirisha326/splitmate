@@ -1,15 +1,12 @@
 package com.splitmate.backend.service;
 
+import com.resend.Resend;
+import com.resend.services.emails.model.CreateEmailOptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 
 @Service
 @RequiredArgsConstructor
@@ -19,9 +16,6 @@ public class EmailService {
     @Value("${RESEND_API_KEY}")
     private String resendApiKey;
 
-    @Value("${MAIL_USERNAME}")
-    private String fromEmail;
-
     @Value("${app.base-url}")
     private String baseUrl;
 
@@ -29,46 +23,22 @@ public class EmailService {
 
         try {
 
-            URL url = new URL("https://api.resend.com/emails");
+            Resend resend = new Resend(resendApiKey);
 
-            HttpURLConnection conn =
-                    (HttpURLConnection) url.openConnection();
+            CreateEmailOptions params = CreateEmailOptions.builder()
+                    .from("SplitMate <onboarding@resend.dev>")
+                    .to(toEmail)
+                    .subject(subject)
+                    .html(htmlContent)
+                    .build();
 
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Authorization",
-                    "Bearer " + resendApiKey);
+            resend.emails().send(params);
 
-            conn.setRequestProperty("Content-Type",
-                    "application/json");
-
-            conn.setDoOutput(true);
-
-            JSONObject json = new JSONObject();
-
-            json.put("from", "SplitMate <" + fromEmail + ">");
-            json.put("to", toEmail);
-            json.put("subject", subject);
-            json.put("html", htmlContent);
-
-            OutputStream os = conn.getOutputStream();
-            os.write(json.toString().getBytes());
-            os.flush();
-            os.close();
-
-            int responseCode = conn.getResponseCode();
-
-            if (responseCode >= 200 && responseCode < 300) {
-                log.info("Email sent successfully to {}", toEmail);
-            } else {
-                log.error("Failed to send email. Response code: {}",
-                        responseCode);
-            }
+            log.info("Email sent successfully to {}", toEmail);
 
         } catch (Exception e) {
 
-            log.error("Failed to send email to {}: {}",
-                    toEmail,
-                    e.getMessage());
+            log.error("Failed to send email: {}", e.getMessage());
         }
     }
 
