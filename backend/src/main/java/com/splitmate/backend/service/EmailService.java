@@ -1,38 +1,104 @@
 package com.splitmate.backend.service;
 
-import com.resend.Resend;
-import com.resend.services.emails.model.CreateEmailOptions;
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.services.gmail.Gmail;
+import com.google.api.services.gmail.model.Message;
+import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.auth.oauth2.UserCredentials;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.apache.commons.codec.binary.Base64;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
+import jakarta.mail.Session;
+import jakarta.mail.internet.InternetAddress;
+import jakarta.mail.internet.MimeMessage;
+
+import java.io.ByteArrayOutputStream;
+import java.util.Properties;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class EmailService {
 
-    @Value("${RESEND_API_KEY}")
-    private String resendApiKey;
+    @Value("${gmail.client.id}")
+    private String clientId;
+
+    @Value("${gmail.client.secret}")
+    private String clientSecret;
+
+    @Value("${gmail.refresh.token}")
+    private String refreshToken;
+
+    @Value("${gmail.sender.email}")
+    private String senderEmail;
 
     @Value("${app.base-url}")
     private String baseUrl;
 
-    private void sendEmail(String toEmail, String subject, String htmlContent) {
+    private Gmail getGmailService() throws Exception {
+
+        UserCredentials credentials =
+                UserCredentials.newBuilder()
+                        .setClientId(clientId)
+                        .setClientSecret(clientSecret)
+                        .setRefreshToken(refreshToken)
+                        .build();
+
+        return new Gmail.Builder(
+                GoogleNetHttpTransport.newTrustedTransport(),
+                GsonFactory.getDefaultInstance(),
+                new HttpCredentialsAdapter(credentials)
+        )
+                .setApplicationName("SplitMate")
+                .build();
+    }
+
+    private void sendEmail(String toEmail,
+                           String subject,
+                           String htmlContent) {
 
         try {
 
-            Resend resend = new Resend(resendApiKey);
+            Gmail service = getGmailService();
 
-            CreateEmailOptions params = CreateEmailOptions.builder()
-                    .from("SplitMate <onboarding@resend.dev>")
-                    .to(toEmail)
-                    .subject(subject)
-                    .html(htmlContent)
-                    .build();
+            Properties props = new Properties();
+            Session session = Session.getDefaultInstance(props, null);
 
-            resend.emails().send(params);
+            MimeMessage email = new MimeMessage(session);
+
+            email.setFrom(new InternetAddress(senderEmail));
+            email.addRecipient(
+                    jakarta.mail.Message.RecipientType.TO,
+                    new InternetAddress(toEmail)
+            );
+
+            email.setSubject(subject);
+            email.setContent(htmlContent, "text/html; charset=utf-8");
+
+            ByteArrayOutputStream buffer =
+                    new ByteArrayOutputStream();
+
+            email.writeTo(buffer);
+
+            String encodedEmail =
+                    Base64.encodeBase64URLSafeString(
+                            buffer.toByteArray()
+                    );
+
+            Message message = new Message();
+            message.setRaw(encodedEmail);
+
+            service.users()
+                    .messages()
+                    .send("me", message)
+                    .execute();
 
             log.info("Email sent successfully to {}", toEmail);
 
